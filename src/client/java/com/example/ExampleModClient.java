@@ -20,16 +20,15 @@ public class ExampleModClient implements ClientModInitializer {
 
     @Override
     public void onInitializeClient() {
-        HudRenderCallback.EVENT.register((GuiGraphics gfx, DeltaTracker delta) -> onHudRender(gfx, delta));
+        HudRenderCallback.EVENT.register((GuiGraphics gfx, DeltaTracker delta) -> onHudRender(gfx));
     }
 
-    private void onHudRender(GuiGraphics gfx, DeltaTracker delta) {
+    private void onHudRender(GuiGraphics gfx) {
         Minecraft mc = Minecraft.getInstance();
         if (mc == null || mc.level == null) return;
 
         Font font = mc.font;
 
-        // Contenu des lignes
         int fps = mc.getFps();
         String line1 = "" + fps;
 
@@ -43,15 +42,14 @@ public class ExampleModClient implements ClientModInitializer {
 
         Holder<Biome> biomeHolder = mc.level.getBiome(bp);
         String biomeId = biomeHolder.unwrapKey()
-                .map(k -> k.location().toString()) // e.g. "minecraft:plains"
+                .map(k -> k.location().toString())
                 .orElse("unknown:unknown");
         String line3 = biomeId.replace("minecraft:", "");
 
         String line4 = formatMcTime(mc.level.getDayTime());
 
-        // Couleur de fond selon le biome
-        int bgColor = pickBiomeTint(biomeId);    // ARGB
-        int border = 0x66000000;                 // bordure sombre légère
+        int bgColor = pickBiomeTint(biomeId);
+        int border = 0x66000000;
 
         // Mesures
         int pad = 6;
@@ -70,10 +68,8 @@ public class ExampleModClient implements ClientModInitializer {
         int boxW = maxW + pad * 2;
         int boxH = (lineH * lines) + (gap * (lines - 1)) + pad * 2;
 
-        // Dessin de l'encadré
         fillWithBorder(gfx, x, y, x + boxW, y + boxH, bgColor, border);
 
-        // Texte: blanc avec ombre pour rester lisible
         int textColor = 0xFFFFFFFF;
         int ty = y + pad;
         drawStringShadow(gfx, font, line1, x + pad, ty, textColor);
@@ -90,10 +86,8 @@ public class ExampleModClient implements ClientModInitializer {
                 int iconX = x + pad;
                 int iconY = y + boxH + 4;
 
-                // Icône
                 gfx.renderItem(chest, iconX, iconY);
 
-                // Durabilité
                 int max = chest.getMaxDamage();
                 int used = chest.getDamageValue();
                 int left = Math.max(0, max - used);
@@ -106,7 +100,6 @@ public class ExampleModClient implements ClientModInitializer {
                 int textY = iconY + 4;
                 drawStringShadow(gfx, font, "Elytra: " + left, textX, textY, duraColor);
 
-                // Vitesse d’élytra (m/s) si on plane
                 if (mc.player.isFallFlying()) {
                     Vec3 v = mc.player.getDeltaMovement();
                     double speed = v.length() * 20.0; // blocs/s
@@ -121,7 +114,6 @@ public class ExampleModClient implements ClientModInitializer {
 
     private String compassLine(Minecraft mc) {
         if (mc.player == null) return "↔ ?";
-        // Mojang: yaw 0 = Sud; on décale pour que 0 = Nord
         double deg = Mth.wrapDegrees(mc.player.getYRot() - 180.0F);
         String[] dirs   = {"N","NE","E","SE","S","SW","W","NW"};
         String[] arrows = {"↑","↗","→","↘","↓","↙","←","↖"};
@@ -146,32 +138,25 @@ public class ExampleModClient implements ClientModInitializer {
         return res;
     }
 
-    // Encadré plein + petite bordure
     private void fillWithBorder(GuiGraphics gfx, int x1, int y1, int x2, int y2, int fill, int border) {
-        // fond
         gfx.fill(x1, y1, x2, y2, fill);
-        // bordure 1 px
         gfx.fill(x1, y1, x2, y1 + 1, border);
         gfx.fill(x1, y2 - 1, x2, y2, border);
         gfx.fill(x1, y1, x1 + 1, y2, border);
         gfx.fill(x2 - 1, y1, x2, y2, border);
     }
 
-    // Texte avec ombre (lisibilité)
     private void drawStringShadow(GuiGraphics gfx, Font font, String txt, int x, int y, int color) {
         gfx.drawString(font, txt, x, y, color, true);
     }
 
-    // Mapping très robuste par mots-clés du biomeId (namespace:path)
     private int pickBiomeTint(String biomeId) {
         String id = biomeId.toLowerCase();
 
-        // Aquatique (bleu)
         if (containsAny(id, "ocean", "river", "frozen_river", "snwoy_beach", "beach", "mangrove_swamp", "swamp", "warm_ocean", "cold_ocean", "deep_ocean", "lukewarm_ocean", "deep_lukewarm_ocean", "deep_cold_ocean", "frozen_ocean", "deep_frozen_ocean")) {
             return 0xAA2B77FF; // bleu semi-opaque
         }
 
-        // Forêts / jungles / bois (vert)
         if (containsAny(id, "mushroom_fields", "plains", "sunflower_plains", "forest", "flower_forest", "meadow", "pale_garden", "jungle", "sparse_jungle", "taiga", "old_growth_pine_taiga", "old_growth_spruce_taiga", "dark_forest", "bamboo_jungle", "birch_forest", "old_growth_birch_forest")) {
             return 0xAA34C759; // vert semi-opaque
         }
@@ -192,32 +177,26 @@ public class ExampleModClient implements ClientModInitializer {
             return 0xAAC8FA00; // jaune semi-opaque
         }
 
-        // Neige / glace (blanc/gris très clair)
         if (containsAny(id, "jagged_peaks", "frozen_peaks", "grove", "snowy_slopes", "snowy_taiga", "snowy_plains", "ice_spikes")) {
             return 0xAAFFFFFF; // blanc semi-opaque
         }
 
-        // Désert / savane / badlands (orangé)
         if (containsAny(id, "desert", "savanna", "badlands", "mesa")) {
             return 0xAADFAE47; // sable/orangé
         }
 
-        // Montagne / pics (gris bleuté)
         if (containsAny(id, "stony_peaks", "stony_shore", "windswept_hills", "windswept_gravelly_hills", "windswept_forest")) {
             return 0xAA7A8C99;
         }
 
-        // Nether (rouge sombre)
         if (containsAny(id, "nether", "basalt", "soul_", "crimson", "warped", "delta")) {
             return 0xAAE74C3C;
         }
 
-        // The End (violet)
         if (containsAny(id, "the_end", ":end", "chorus", "end_highlands", "end_midlands", "end_barrens")) {
             return 0xAABB6BD9;
         }
 
-        // Couleur par défaut (gris anthracite légèrement transparent)
         return 0xAA2C2C2C;
     }
 
