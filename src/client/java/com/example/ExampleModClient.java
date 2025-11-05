@@ -10,6 +10,11 @@ import net.minecraft.client.gui.GuiGraphics;
 import net.minecraft.core.BlockPos;
 import net.minecraft.core.Holder;
 import net.minecraft.world.level.biome.Biome;
+import net.minecraft.world.entity.EquipmentSlot;
+import net.minecraft.world.item.ItemStack;
+import net.minecraft.world.item.Items;
+import net.minecraft.world.phys.Vec3;
+import net.minecraft.util.Mth;
 
 public class ExampleModClient implements ClientModInitializer {
 
@@ -28,11 +33,13 @@ public class ExampleModClient implements ClientModInitializer {
         int fps = mc.getFps();
         String line1 = "" + fps;
 
+        String lineCompasss = compassLine(mc);
         BlockPos bp = mc.player != null ? mc.player.blockPosition() : BlockPos.ZERO;
         double xExact = mc.player != null ? mc.player.getX() : 0.0;
         double yExact = mc.player != null ? mc.player.getY() : 0.0;
         double zExact = mc.player != null ? mc.player.getZ() : 0.0;
         String line2 = String.format("%.1f / %.1f / %.1f", xExact, yExact, zExact);
+        line2 += " " + lineCompasss;
 
         Holder<Biome> biomeHolder = mc.level.getBiome(bp);
         String biomeId = biomeHolder.unwrapKey()
@@ -53,7 +60,7 @@ public class ExampleModClient implements ClientModInitializer {
         int y = 4;
 
         int w1 = font.width(line1);
-        int w2 = font.width(line2);
+        int w2 = 142;
         int w3 = font.width(line3);
         int w4 = font.width(line4);
         int maxW = Math.max(Math.max(w1, w2), Math.max(w3, w4));
@@ -76,6 +83,51 @@ public class ExampleModClient implements ClientModInitializer {
         drawStringShadow(gfx, font, line3, x + pad, ty, textColor);
         ty += lineH + gap;
         drawStringShadow(gfx, font, line4, x + pad, ty, textColor);
+
+        if (mc.player != null) {
+            ItemStack chest = mc.player.getItemBySlot(EquipmentSlot.CHEST);
+            if (!chest.isEmpty() && chest.is(Items.ELYTRA)) {
+                int iconX = x + pad;
+                int iconY = y + boxH + 4;
+
+                // Icône
+                gfx.renderItem(chest, iconX, iconY);
+
+                // Durabilité
+                int max = chest.getMaxDamage();
+                int used = chest.getDamageValue();
+                int left = Math.max(0, max - used);
+                float pct = max > 0 ? (left / (float) max) : 0f;
+                int duraColor = (pct >= 0.60f) ? 0xFF34C759
+                        : (pct >= 0.25f) ? 0xFFF2C94C
+                        : 0xFFFF3B30;
+
+                int textX = iconX + 18;
+                int textY = iconY + 4;
+                drawStringShadow(gfx, font, "Elytra: " + left, textX, textY, duraColor);
+
+                // Vitesse d’élytra (m/s) si on plane
+                if (mc.player.isFallFlying()) {
+                    Vec3 v = mc.player.getDeltaMovement();
+                    double speed = v.length() * 20.0; // blocs/s
+                    String sp = String.format("✈ %.1f m/s", speed);
+
+                    int speedY = textY + lineH + 2;
+                    drawStringShadow(gfx, font, sp, textX, speedY, 0xFFFFFFFF);
+                }
+            }
+        }
+    }
+
+    private String compassLine(Minecraft mc) {
+        if (mc.player == null) return "↔ ?";
+        // Mojang: yaw 0 = Sud; on décale pour que 0 = Nord
+        double deg = Mth.wrapDegrees(mc.player.getYRot() - 180.0F);
+        String[] dirs   = {"N","NE","E","SE","S","SW","W","NW"};
+        String[] arrows = {"↑","↗","→","↘","↓","↙","←","↖"};
+        int idx = (int) Math.floor((deg + 22.5) / 45.0);
+        idx = ((idx % 8) + 8) % 8;
+        return arrows[idx] + " " + dirs[idx];
     }
 
     private String formatMcTime(long dayTime) {
@@ -115,17 +167,33 @@ public class ExampleModClient implements ClientModInitializer {
         String id = biomeId.toLowerCase();
 
         // Aquatique (bleu)
-        if (containsAny(id, "ocean", "river", "beach", "lake", "reef", "mangrove_swamp", "swamp", "warm_ocean", "cold_ocean", "deep_ocean")) {
+        if (containsAny(id, "ocean", "river", "frozen_river", "snwoy_beach", "beach", "mangrove_swamp", "swamp", "warm_ocean", "cold_ocean", "deep_ocean", "lukewarm_ocean", "deep_lukewarm_ocean", "deep_cold_ocean", "frozen_ocean", "deep_frozen_ocean")) {
             return 0xAA2B77FF; // bleu semi-opaque
         }
 
         // Forêts / jungles / bois (vert)
-        if (containsAny(id, "forest", "meadow", "pale_garden", "jungle", "taiga", "grove", "wood", "birch", "spruce", "dark_forest", "bamboo")) {
+        if (containsAny(id, "mushroom_fields", "plains", "sunflower_plains", "forest", "flower_forest", "meadow", "pale_garden", "jungle", "sparse_jungle", "taiga", "old_growth_pine_taiga", "old_growth_spruce_taiga", "dark_forest", "bamboo_jungle", "birch_forest", "old_growth_birch_forest")) {
             return 0xAA34C759; // vert semi-opaque
         }
 
+        if (containsAny(id,  "cherry_grove")) {
+            return 0xAAFF05CD; // rose semi-opaque
+        }
+
+        if (containsAny(id,  "deep_dark")) {
+            return 0xAA000000; // noir semi-opaque
+        }
+
+        if (containsAny(id,  "dripstone_caves")) {
+            return 0xAA7A3737; // marron semi-opaque
+        }
+
+        if (containsAny(id,  "lush_caves")) {
+            return 0xAAC8FA00; // jaune semi-opaque
+        }
+
         // Neige / glace (blanc/gris très clair)
-        if (containsAny(id, "snow", "snowy", "frozen", "ice", "icy", "glacier")) {
+        if (containsAny(id, "jagged_peaks", "frozen_peaks", "grove", "snowy_slopes", "snowy_taiga", "snowy_plains", "ice_spikes")) {
             return 0xAAFFFFFF; // blanc semi-opaque
         }
 
@@ -135,7 +203,7 @@ public class ExampleModClient implements ClientModInitializer {
         }
 
         // Montagne / pics (gris bleuté)
-        if (containsAny(id, "mountain", "peaks", "hills", "highlands", "stony")) {
+        if (containsAny(id, "stony_peaks", "stony_shore", "windswept_hills", "windswept_gravelly_hills", "windswept_forest")) {
             return 0xAA7A8C99;
         }
 
